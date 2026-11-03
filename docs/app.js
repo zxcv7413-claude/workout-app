@@ -1,5 +1,30 @@
-'use strict';
-/* 운동기록 PWA — 바닐라 JS, 데이터는 기기의 IndexedDB에 저장됩니다. */
+/* 운동기록 PWA — 바닐라 JS + Firebase(로그인/Firestore 동기화, 오프라인 지원) */
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch }
+  from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+// Firebase 웹 설정값 (공개되어도 되는 값이며, 데이터 보호는 로그인 + Firestore 보안 규칙이 담당합니다)
+const firebaseConfig = {
+  apiKey: 'AIzaSyAQBS9VU0FbPvDeITkNm4Hio5MDXALABGM',
+  authDomain: 'workout-app-7b744.firebaseapp.com',
+  projectId: 'workout-app-7b744',
+  storageBucket: 'workout-app-7b744.firebasestorage.app',
+  messagingSenderId: '407418042563',
+  appId: '1:407418042563:web:f54317c8fa0ed93033ca76',
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+const AUTH = { status: 'loading', user: null, error: '', busy: false }; // loading | out | in
+let UID = null, unsubs = [], loaded = { state: false, logs: false, photos: false };
+const ref = {
+  state: () => doc(fs, 'users', UID, 'data', 'state'),
+  log: id => doc(fs, 'users', UID, 'logs', id),
+  photo: id => doc(fs, 'users', UID, 'photos', id),
+  logs: () => collection(fs, 'users', UID, 'logs'),
+  photos: () => collection(fs, 'users', UID, 'photos'),
+};
 
 // ───────────────────────── 유틸
 const $app = document.getElementById('app');
@@ -20,7 +45,7 @@ function toast(msg) {
   setTimeout(() => t.remove(), 1800);
 }
 
-// ───────────────────────── 저장소 (IndexedDB)
+// ───────────────────────── (구버전) 기기 내 IndexedDB — 기존 데이터를 클라우드로 옮길 때만 읽습니다
 const DB = {
   db: null,
   open() {
@@ -61,8 +86,31 @@ function initState() {
   return { v: 1, exercises, plan, logs: [], active: null, settings: { rest: 90 } };
 }
 let saveTimer = null;
+const ready = () => AUTH.status === 'in' && loaded.state && loaded.logs && loaded.photos && S;
+const fail = e => { console.error(e); toast('저장에 실패했습니다'); };
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(flush, 250); }
-function flush() { clearTimeout(saveTimer); if (S) DB.put('kv', 'state', S); }
+// 상태 문서(운동 목록·플랜·진행 중 운동·설정)를 저장. 기록(logs)과 사진은 각각 별도 문서로 저장합니다.
+function flush() {
+  clearTimeout(saveTimer);
+  if (!ready()) return;
+  const { logs, ...rest } = S;
+  setDoc(ref.state(), { json: JSON.stringify(rest), updatedAt: Date.now() }).catch(fail);
+}
+const saveLog = l => { if (UID) setDoc(ref.log(l.id), { json: JSON.stringify(l), start: l.start }).catch(fail); };
+const removeLog = id => { if (UID) deleteDoc(ref.log(id)).catch(fail); };
+const savePhoto = (id, data) => { if (UID) setDoc(ref.photo(id), { data }).catch(fail); };
+const removePhoto = id => { if (UID) deleteDoc(ref.photo(id)).catch(fail); };
+// 기록/사진 문서를 통째로 교체 (가져오기·초기화용). 한 번에 최대 500건이라 나눠서 처리합니다.
+async function replaceAll(newS, newP) {
+  const ops = [];
+  S.logs.forEach(l => ops.push(b => b.delete(ref.log(l.id))));
+  Object.keys(P).forEach(k => ops.push(b => b.delete(ref.photo(k))));
+  newS.logs.forEach(l => ops.push(b => b.set(ref.log(l.id), { json: JSON.stringify(l), start: l.start })));
+  Object.keys(newP).forEach(k => ops.push(b => b.set(ref.photo(k), { data: newP[k] })));
+  S = newS; P = newP; flush();
+  // 오프라인이어도 쓰기는 대기열에 쌓였다가 연결되면 반영됩니다.
+  for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(fs); ops.slice(i, i + 400).forEach(f => f(b)); b.commit().catch(fail); }
+}
 document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); else tick(); });
 window.addEventListener('pagehide', flush);
 
@@ -95,7 +143,21 @@ function thumb(ex) {
   return `<div class="thumb">${esc(ex ? ex.part : '?')}</div>`;
 }
 
+function authView() {
+  if (AUTH.status === 'loading' || (AUTH.status === 'in' && !ready())) {
+    return `<div class="screen" style="align-items:center;justify-content:center"><div style="color:var(--sub)">불러오는 중…</div>
+      ${AUTH.status === 'in' ? '<button class="btn" style="margin-top:20px" data-a="logout">로그아웃</button>' : ''}</div>`;
+  }
+  return `<div class="screen" style="justify-content:center;padding:24px">
+    <div style="text-align:center;font-size:44px">🏋️</div><h1 style="text-align:center;margin:6px 0 20px">운동기록</h1>
+    <label>이메일</label><input id="loginEmail" type="email" autocomplete="username" autocapitalize="off" inputmode="email" value="${esc(AUTH.email || '')}">
+    <label>비밀번호</label><input id="loginPw" type="password" autocomplete="current-password">
+    ${AUTH.error ? `<div style="color:var(--danger);margin-top:12px;font-size:14px">${esc(AUTH.error)}</div>` : ''}
+    <button class="btn primary block" style="margin-top:20px" data-a="login" ${AUTH.busy ? 'disabled' : ''}>${AUTH.busy ? '로그인 중…' : '로그인'}</button></div>`;
+}
+
 function render() {
+  if (!ready()) { $app.innerHTML = authView(); return; }
   const sc = {}; $app.querySelectorAll('.scroll').forEach(e => sc[e.dataset.k] = e.scrollTop);
   let html = baseView();
   U.stack.forEach((s, i) => { html += screenView(s, i); });
@@ -271,7 +333,8 @@ function finishWorkout() {
     return;
   }
   if (!confirm('운동을 종료하고 저장할까요?')) return;
-  S.logs.push({ id: uid(), start: a.start, end: Date.now(), day: a.day, title: a.title, entries });
+  const log = { id: uid(), start: a.start, end: Date.now(), day: a.day, title: a.title, entries };
+  S.logs.push(log); saveLog(log);
   if (confirm('오늘 수행한 무게/횟수를 플랜에 반영할까요?\n(마지막으로 완료한 세트 기준)')) {
     entries.forEach(e => {
       const it = S.plan[a.day].items.find(i => i.exId === e.exId); const last = e.sets[e.sets.length - 1];
@@ -324,15 +387,16 @@ function settingsView() {
   return `${topbar('', '설정', '')}<div class="scroll" data-k="set">
     <div class="card"><label style="margin-top:0">기본 휴식 시간 (초)</label><input id="restSec" inputmode="numeric" value="${S.settings.rest}"></div>
     <div class="card"><div style="font-weight:700;margin-bottom:6px">데이터 백업</div>
-      <div class="hint">기록은 이 기기의 앱 안에만 저장됩니다. 앱을 삭제하거나 홈 화면에서 다시 추가하면 사라질 수 있으니 주기적으로 내보내기를 해 두세요.</div>
+      <div class="hint">기록은 로그인한 계정의 클라우드에 저장되어 Mac과 아이폰에서 함께 쓸 수 있습니다. 만일을 위해 가끔 내보내기로 파일 백업도 해 두세요.</div>
       <div class="row" style="margin-top:12px"><button class="btn" data-a="export">내보내기</button>
       <label class="btn" style="text-align:center;cursor:pointer">가져오기<input type="file" accept="application/json,.json" id="importIn" style="display:none"></label></div></div>
-    <div class="card"><div style="font-weight:700;margin-bottom:6px">저장 상태</div><div class="hint" id="storeInfo">확인 중…</div></div>
+    <div class="card"><div style="font-weight:700;margin-bottom:6px">계정 · 동기화</div><div class="hint" id="storeInfo">계정: ${esc(AUTH.user ? AUTH.user.email : '-')}<br>기록 ${S.logs.length}회 · 운동 ${S.exercises.length}개</div>
+      <button class="btn block" style="margin-top:10px" data-a="logout">로그아웃</button></div>
     <div class="card"><div style="font-weight:700;margin-bottom:6px">기본 가이드 복원</div>
       <div class="hint">기본 운동 목록에서 빠진 항목을 다시 추가합니다. 수정한 가이드·메모는 유지됩니다.</div>
       <button class="btn block" style="margin-top:10px" data-a="restoreDefaults">복원</button></div>
     <button class="btn danger block" style="margin-top:18px" data-a="reset">모든 데이터 초기화</button>
-    <div class="hint" style="text-align:center;margin-top:16px">운동기록 v1 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
+    <div class="hint" style="text-align:center;margin-top:16px">운동기록 v2 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
 }
 
 // ───────────────────────── 시트(모달)
@@ -385,6 +449,9 @@ document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-a]'); if (!el) return;
   if (el.classList.contains('overlay') && ev.target !== el) return;
   const a = el.dataset.a, v = el.dataset.v, id = el.dataset.id, i = el.dataset.i !== undefined ? +el.dataset.i : null;
+  if (a === 'login') { doLogin(); return; }
+  if (a === 'logout') { if (confirm('로그아웃할까요?')) signOut(auth); return; }
+  if (!ready()) return;
   const d = S.plan[U.day];
   switch (a) {
     case 'tab': U.tab = v; U.edit = false; break;
@@ -413,7 +480,7 @@ document.addEventListener('click', ev => {
       const ex = exById(U.sheet.id);
       if (ex && confirm(`'${ex.name}' 운동을 삭제할까요? 플랜에서도 제거됩니다. (과거 기록은 남습니다)`)) {
         S.exercises = S.exercises.filter(e => e.id !== ex.id); S.plan.forEach(p => p.items = p.items.filter(x => x.exId !== ex.id));
-        (ex.photos || []).forEach(p => { delete P[p]; DB.del('photos', p); });
+        (ex.photos || []).forEach(p => { delete P[p]; removePhoto(p); });
         U.sheet = null; U.stack = U.stack.filter(s => !(s.t === 'ex' && s.id === ex.id)); save();
       }
       break;
@@ -426,7 +493,7 @@ document.addEventListener('click', ev => {
     case 'exMetric': topEx().metric = v; break;
     case 'photoDel': {
       const ex = exById(topEx().id);
-      if (confirm('이 사진을 삭제할까요?')) { ex.photos = ex.photos.filter(p => p !== el.dataset.p); delete P[el.dataset.p]; DB.del('photos', el.dataset.p); save(); }
+      if (confirm('이 사진을 삭제할까요?')) { ex.photos = ex.photos.filter(p => p !== el.dataset.p); delete P[el.dataset.p]; removePhoto(el.dataset.p); save(); }
       break;
     }
     case 'libPart': U.libPart = v; break;
@@ -444,7 +511,7 @@ document.addEventListener('click', ev => {
     case 'restAdj': S.active.restEnd = Math.max(Date.now() + 1000, S.active.restEnd + (+v) * 1000); save(); break;
     case 'restSkip': S.active.restEnd = null; save(); break;
     case 'sess': U.stack.push({ t: 'sess', id }); break;
-    case 'delSess': if (confirm('이 운동 기록을 삭제할까요?')) { S.logs = S.logs.filter(l => l.id !== id); U.stack.pop(); save(); } break;
+    case 'delSess': if (confirm('이 운동 기록을 삭제할까요?')) { S.logs = S.logs.filter(l => l.id !== id); removeLog(id); U.stack.pop(); save(); } break;
     case 'export': exportData(); return;
     case 'restoreDefaults': {
       let n = 0; DEFAULT_EXERCISES.forEach(e => { if (!exById(e.id)) { S.exercises.push({ ...e, memo: '', photos: [] }); n++; } });
@@ -452,13 +519,13 @@ document.addEventListener('click', ev => {
     }
     case 'reset':
       if (confirm('모든 플랜·기록·메모·사진이 삭제됩니다. 계속할까요?') && confirm('정말 초기화할까요? 되돌릴 수 없습니다.')) {
-        S = initState(); P = {}; DB.clear('photos'); U.stack = []; U.tab = 'plan'; save();
+        replaceAll(initState(), {}); U.stack = []; U.tab = 'plan';
       }
       break;
     default: return;
   }
   render();
-  if (a === 'tab' && U.tab === 'set') storageInfo();
+  if (a === 'tab' && U.tab === 'set') accountInfo();
 });
 
 function saveEx() {
@@ -477,6 +544,7 @@ function saveEx() {
 
 // 입력 이벤트(리렌더 없이 상태만 갱신)
 document.addEventListener('input', ev => {
+  if (!ready()) return;
   const t = ev.target;
   if (t.dataset && t.dataset.f && S.active) { S.active.entries[+t.dataset.w].sets[+t.dataset.s][t.dataset.f] = t.value; save(); }
   else if (t.id === 'dayTitle') { S.plan[U.day].title = t.value; save(); }
@@ -487,10 +555,11 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', async ev => {
+  if (!ready()) return;
   const t = ev.target;
   if (t.id === 'photoIn' && t.files[0]) {
     try {
-      const url = await resizeImage(t.files[0]); const pid = 'p-' + uid(); P[pid] = url; await DB.put('photos', pid, url);
+      const url = await resizeImage(t.files[0]); const pid = 'p-' + uid(); P[pid] = url; savePhoto(pid, url);
       const ex = exById(t.dataset.id); ex.photos = ex.photos || []; ex.photos.push(pid); save(); render(); toast('사진을 추가했습니다');
     } catch (e) { toast('사진을 불러오지 못했습니다'); }
   } else if (t.id === 'importIn' && t.files[0]) importData(t.files[0]);
@@ -524,33 +593,78 @@ async function importData(file) {
     const obj = JSON.parse(await file.text());
     if (!obj.S || !Array.isArray(obj.S.exercises) || !Array.isArray(obj.S.plan)) throw new Error('형식 오류');
     if (!confirm('현재 데이터를 백업 파일의 내용으로 덮어씁니다. 계속할까요?')) return;
-    S = obj.S; P = obj.P || {}; await DB.clear('photos');
-    for (const k of Object.keys(P)) await DB.put('photos', k, P[k]);
-    U.stack = []; U.tab = 'plan'; flush(); render(); toast('가져오기 완료');
+    obj.S.logs = obj.S.logs || [];
+    await replaceAll(normalizeState(obj.S), obj.P || {});
+    U.stack = []; U.tab = 'plan'; render(); toast('가져오기 완료');
   } catch (e) { alert('백업 파일을 읽을 수 없습니다.'); }
 }
-async function storageInfo() {
+function accountInfo() {
   const el = document.getElementById('storeInfo'); if (!el) return;
-  try {
-    const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
-    const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
-    const standalone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-    el.innerHTML = `${standalone ? '홈 화면 앱으로 실행 중' : '⚠️ 브라우저에서 실행 중 (홈 화면에 추가 후 사용하세요)'}<br>영구 저장 요청: ${persisted ? '허용됨' : '미허용'}` +
-      (est ? `<br>사용량: ${(est.usage / 1048576).toFixed(1)}MB` : '') + `<br>기록 ${S.logs.length}회 · 운동 ${S.exercises.length}개`;
-  } catch (e) { el.textContent = '확인 불가'; }
+  el.innerHTML = `계정: ${esc(AUTH.user ? AUTH.user.email : '-')}<br>${navigator.onLine ? '온라인 — 변경 사항이 자동으로 동기화됩니다' : '⚠️ 오프라인 — 연결되면 자동으로 동기화됩니다'}<br>기록 ${S.logs.length}회 · 운동 ${S.exercises.length}개`;
 }
 
-// ───────────────────────── 시작
-(async function boot() {
-  try {
-    await DB.open();
-    S = await DB.get('kv', 'state'); P = await DB.all('photos');
-  } catch (e) { S = null; P = {}; }
-  if (!S) { S = initState(); if (DB.db) flush(); }
-  // 호환성 보정
-  S.settings = S.settings || { rest: 90 }; S.logs = S.logs || []; S.exercises.forEach(e => { e.photos = e.photos || []; e.memo = e.memo || ''; });
-  if (S.active) U.stack.push({ t: 'workout' });
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
+// ───────────────────────── 로그인 / 클라우드 동기화
+function normalizeState(s) {
+  s.settings = s.settings || { rest: 90 }; s.active = s.active || null; s.logs = s.logs || [];
+  s.exercises.forEach(e => { e.photos = e.photos || []; e.memo = e.memo || ''; });
+  return s;
+}
+let cloudLogs = [], shown = false, renderPending = false, bootstrapping = false;
+function stopSync() { unsubs.forEach(u => u()); unsubs = []; loaded = { state: false, logs: false, photos: false }; cloudLogs = []; bootstrapping = false; }
+function afterRemote() {
+  if (!(loaded.state && loaded.logs && loaded.photos)) return;
+  if (!shown) { shown = true; if (S.active && !U.stack.some(x => x.t === 'workout')) U.stack.push({ t: 'workout' }); render(); return; }
+  const a = document.activeElement;
+  if (a && $app.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { renderPending = true; return; } // 입력 중에는 화면 갱신을 미룸
   render();
-})();
+}
+document.addEventListener('focusout', () => {
+  if (!renderPending) return;
+  setTimeout(() => { const a = document.activeElement; if (!(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName))) { renderPending = false; render(); } }, 80);
+});
+// 이 기기에 예전(로그인 도입 전)에 저장된 데이터가 있으면 클라우드로 옮기고, 없으면 기본 데이터로 시작
+async function bootstrapCloud() {
+  let st = null, ph = {};
+  try { await DB.open(); const old = await DB.get('kv', 'state'); if (old && Array.isArray(old.exercises)) { st = old; ph = await DB.all('photos'); } } catch (e) { /* 없음 */ }
+  S = { logs: [] }; P = {};
+  await replaceAll(normalizeState(st || initState()), ph);
+}
+function startSync() {
+  stopSync();
+  unsubs.push(onSnapshot(ref.state(), snap => {
+    if (!snap.exists()) { if (!snap.metadata.fromCache && !bootstrapping) { bootstrapping = true; bootstrapCloud(); } return; }
+    if (loaded.state && snap.metadata.hasPendingWrites) return; // 내가 방금 쓴 변경은 이미 반영되어 있음
+    try { S = normalizeState({ ...JSON.parse(snap.data().json), logs: cloudLogs }); } catch (e) { return fail(e); }
+    loaded.state = true; afterRemote();
+  }, e => { console.error(e); AUTH.error = '데이터를 불러오지 못했습니다 (' + (e.code || e.message) + ')'; render(); }));
+  unsubs.push(onSnapshot(ref.logs(), snap => {
+    cloudLogs = snap.docs.map(d => { try { return JSON.parse(d.data().json); } catch (e) { return null; } }).filter(Boolean);
+    if (S) S.logs = cloudLogs;
+    loaded.logs = true; afterRemote();
+  }, console.error));
+  unsubs.push(onSnapshot(ref.photos(), snap => {
+    P = {}; snap.docs.forEach(d => { P[d.id] = d.data().data; });
+    loaded.photos = true; afterRemote();
+  }, console.error));
+}
+const AUTH_MSG = {
+  'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않습니다.', 'auth/wrong-password': '이메일 또는 비밀번호가 올바르지 않습니다.',
+  'auth/user-not-found': '이메일 또는 비밀번호가 올바르지 않습니다.', 'auth/invalid-email': '이메일 형식을 확인하세요.',
+  'auth/too-many-requests': '시도가 너무 많습니다. 잠시 후 다시 시도하세요.', 'auth/network-request-failed': '네트워크에 연결할 수 없습니다.',
+};
+function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim(), pw = document.getElementById('loginPw').value;
+  if (!email || !pw) { AUTH.error = '이메일과 비밀번호를 입력하세요.'; AUTH.email = email; render(); return; }
+  AUTH.busy = true; AUTH.error = ''; AUTH.email = email; render();
+  signInWithEmailAndPassword(auth, email, pw).catch(e => { AUTH.busy = false; AUTH.error = AUTH_MSG[e.code] || ('로그인 실패 (' + (e.code || e.message) + ')'); render(); });
+}
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.id === 'loginPw') doLogin(); });
+onAuthStateChanged(auth, user => {
+  if (user) { AUTH.status = 'in'; AUTH.user = user; AUTH.error = ''; AUTH.busy = false; UID = user.uid; render(); startSync(); }
+  else { stopSync(); AUTH.status = 'out'; AUTH.user = null; AUTH.busy = false; UID = null; S = undefined; P = {}; U.stack = []; U.sheet = null; shown = false; render(); }
+});
+
+// ───────────────────────── 시작
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
+render();
