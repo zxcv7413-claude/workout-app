@@ -204,18 +204,104 @@ const DEFAULT_EXERCISES = [
     ['복부를 말아 팔꿈치가 무릎 쪽으로 가도록 숙이세요.', '천천히 돌아오세요.'],
     '숙일 때 내쉬고, 돌아올 때 들이쉬세요.',
     ['엉덩이가 뒤로 빠지며 팔로 당기지 마세요.']) },
+  { id: 'leg-raise', name: '레그 레이즈', part: '코어', guide: g(
+    ['매트 위에 눕습니다.'],
+    ['바닥에 누워 허리를 바닥에 붙이고 손은 엉덩이 옆에 두세요.', '다리를 곧게 펴고 모아 주세요.'],
+    ['다리를 곧게 편 채 바닥과 수직이 될 때까지 들어 올려 주세요.', '발이 바닥에 닿기 직전까지 천천히 내려 주세요.'],
+    '올릴 때 내쉬고, 내릴 때 들이쉬세요.',
+    ['허리가 바닥에서 뜨지 않게 하세요.', '반동을 쓰지 마세요. 힘들면 무릎을 살짝 굽혀도 됩니다.']) },
+  { id: 'crunch', name: '크런치', part: '코어', guide: g(
+    ['매트 위에 눕고 무릎을 세웁니다.'],
+    ['무릎을 굽혀 발바닥을 바닥에 붙이세요.', '손은 가슴 앞이나 귀 옆에 가볍게 두세요.'],
+    ['복부에 힘을 주고 어깨뼈가 바닥에서 떨어질 때까지 상체를 말아 올리세요.', '정점에서 복부를 짜고 천천히 내려오세요.'],
+    '올라올 때 내쉬고, 내려갈 때 들이쉬세요.',
+    ['목을 잡아당기지 마세요. 시선은 천장을 향하게 하세요.', '반동을 쓰지 마세요.']) },
+
+  // ───── 하체 (머신 추가)
+  { id: 'hip-abduction', name: '힙 어브덕션 머신', part: '하체', guide: g(
+    ['시트에 앉아 무릎 바깥쪽 패드에 다리를 댑니다.', '시트와 시작 각도를 조절합니다.'],
+    ['등을 등받이에 붙이고 가슴을 펴 주세요.', '손잡이를 잡고 상체를 고정해 주세요.'],
+    ['무릎을 바깥쪽으로 천천히 벌려 주세요.', '정점에서 엉덩이 바깥쪽 근육을 짜 주세요.', '천천히 시작 위치로 돌아오세요.'],
+    '벌릴 때 내쉬고, 모을 때 들이쉬세요.',
+    ['반동을 쓰지 말고 천천히 움직이세요.', '허리가 들리거나 상체가 흔들리지 않게 하세요.']) },
+  { id: 'hip-adduction', name: '힙 어덕션 머신', part: '하체', guide: g(
+    ['시트에 앉아 무릎 안쪽 패드에 다리를 댑니다.', '시트와 시작 각도를 조절합니다.'],
+    ['등을 등받이에 붙이고 가슴을 펴 주세요.', '손잡이를 잡고 상체를 고정해 주세요.'],
+    ['무릎을 안쪽으로 천천히 모아 주세요.', '정점에서 허벅지 안쪽 근육을 짜 주세요.', '천천히 시작 위치로 돌아오세요.'],
+    '모을 때 내쉬고, 벌릴 때 들이쉬세요.',
+    ['너무 넓게 벌린 상태에서 시작하지 마세요.', '반동을 쓰지 말고 천천히 움직이세요.']) },
+
+  // ───── 삼두 (머신 추가)
+  { id: 'assisted-dips', name: '어시스트 딥스', part: '삼두', guide: g(
+    ['무릎 패드의 보조 무게를 설정합니다. 숫자가 높을수록 보조가 큽니다.', '발판에 무릎을 올리고 손잡이를 잡습니다.'],
+    ['손잡이를 잡고 팔을 펴 몸을 지지하세요.', '가슴을 펴고 어깨를 아래로 내려 주세요.'],
+    ['팔꿈치를 굽혀 몸을 천천히 내려 주세요.', '팔꿈치가 약 90도가 되면 팔을 펴며 올라오세요.'],
+    '내려갈 때 들이쉬고, 올라올 때 내쉬세요.',
+    ['어깨가 으쓱 올라가거나 앞으로 말리지 않게 하세요.', '내려갈 때 어깨가 불편하면 범위를 줄이세요.']) },
+  { id: 'triceps-ext-machine', name: '트라이셉 익스텐션 머신', part: '삼두', guide: g(
+    ['시트 높이를 조절해 팔꿈치가 패드 위에 오도록 합니다.'],
+    ['등을 등받이에 붙이고 팔꿈치를 패드에 고정하세요.', '손잡이를 잡고 팔을 접은 자세에서 시작합니다.'],
+    ['팔꿈치를 고정한 채 손잡이를 앞쪽 아래로 밀어 팔을 펴세요.', '정점에서 삼두를 짜고 천천히 돌아오세요.'],
+    '밀 때 내쉬고, 돌아올 때 들이쉬세요.',
+    ['팔꿈치가 패드에서 떨어지지 않게 하세요.', '팔을 끝까지 잠그지 마세요.']) },
+  { id: 'triceps-pushdown-machine', name: '트라이셉 푸쉬다운 머신', part: '삼두', guide: g(
+    ['시트 높이를 조절해 손잡이가 가슴 높이에 오도록 합니다.'],
+    ['팔꿈치를 몸통 옆에 붙이고 손잡이를 잡으세요.'],
+    ['팔꿈치를 고정한 채 손잡이를 아래로 눌러 팔을 펴세요.', '정점에서 삼두를 짜고 천천히 올라오세요.'],
+    '누를 때 내쉬고, 올라올 때 들이쉬세요.',
+    ['어깨가 올라가지 않게 하세요.', '반동을 쓰지 말고 팔꿈치를 고정하세요.']) },
+
+  // ───── 이두 (케이블 추가)
+  { id: 'cable-biceps-curl', name: '케이블 바이셉 컬', part: '이두', guide: g(
+    ['케이블을 낮은 위치에 설정하고 바 또는 핸들을 연결합니다.'],
+    ['케이블을 마주 보고 서서 팔꿈치를 몸통 옆에 붙이세요.', '가슴을 펴고 손바닥이 앞을 향하게 잡으세요.'],
+    ['팔꿈치를 고정한 채 손잡이를 어깨 쪽으로 말아 올리세요.', '정점에서 이두를 짜고 천천히 내리세요.'],
+    '올릴 때 내쉬고, 내릴 때 들이쉬세요.',
+    ['상체를 젖히며 반동을 쓰지 마세요.', '팔꿈치가 앞으로 밀리지 않게 하세요.']) },
 ];
 
-// 스크린샷의 '길아성의 플랜 1'을 기준으로 한 월요일 초기 플랜 (마지막 항목 수치는 확인되지 않아 임의 값입니다)
-const DEFAULT_PLAN_MON = {
-  title: '등, 이두',
-  items: [
-    ['lat-pulldown', 4, 30, 14],
-    ['parallel-lat-pulldown', 3, 30, 10],
-    ['seated-cable-row', 3, 25, 13],
-    ['incline-db-row', 3, 8, 10],
-    ['db-biceps-curl', 4, 7, 8],
-    ['db-hammer-curl', 3, 6, 15],
-    ['incline-db-curl', 3, 6, 10],
-  ],
+// 표시 옵션: db = 덤벨 두 개(화면에 '덤벨 한 개당', 볼륨 ×2), unit = 'lb'(파운드 단위), mode = 'time'(초 단위 운동), bw = 맨몸(무게 입력 없음)
+const EX_FLAGS = {
+  'incline-db-press': { db: true }, 'incline-db-row': { db: true }, 'db-biceps-curl': { db: true }, 'db-hammer-curl': { db: true },
+  'incline-db-curl': { db: true }, 'db-shoulder-press': { db: true }, 'side-lateral-raise': { db: true },
+  'hip-abduction': { unit: 'lb' }, 'hip-adduction': { unit: 'lb' }, 'pec-deck-fly': { unit: 'lb' }, 'triceps-pushdown': { unit: 'lb' },
+  'plank': { mode: 'time', bw: true }, 'leg-raise': { bw: true }, 'crunch': { bw: true }, 'push-up': { bw: true },
 };
+DEFAULT_EXERCISES.forEach(e => Object.assign(e, EX_FLAGS[e.id] || {}));
+// 참고 앱의 이름에 맞춘 이름 변경 (사용자가 직접 바꾸지 않은 경우에만 적용)
+const EX_RENAMES = {
+  'side-lateral-raise': ['사이드 레터럴 레이즈', '덤벨 레터럴 레이즈'],
+  'incline-db-press': ['인클라인 덤벨 프레스', '인클라인 덤벨 벤치 프레스'],
+  'pec-deck-fly': ['펙덱 플라이', '펙 플라이 머신'],
+  'triceps-pushdown': ['트라이셉스 푸시다운', '케이블 트라이셉 푸쉬다운'],
+};
+
+// 요일별 기본 플랜 [운동 id, 세트, 무게(운동 단위: kg 또는 lbs), 횟수(플랭크는 초)] — 참고 앱 스크린샷 기준
+const MON_ITEMS = [
+  ['lat-pulldown', 4, 30, 14],
+  ['parallel-lat-pulldown', 3, 30, 10],
+  ['seated-cable-row', 3, 25, 13],
+  ['incline-db-row', 3, 8, 10],
+  ['db-biceps-curl', 4, 7, 8],
+  ['db-hammer-curl', 3, 6, 15],
+  ['incline-db-curl', 3, 6, 12],
+];
+const DEFAULT_PLANS = [
+  { title: '등, 이두', items: MON_ITEMS },
+  { title: '다리, 코어, 어깨', items: [
+    ['leg-press', 4, 75, 8], ['leg-extension', 3, 32, 14], ['leg-curl', 3, 32, 13], ['hip-abduction', 3, 100, 12],
+    ['leg-raise', 3, 0, 13], ['crunch', 3, 0, 17], ['plank', 3, 0, 40],
+    ['db-shoulder-press', 4, 6, 13], ['side-lateral-raise', 3, 5, 10]] },
+  { title: '가슴, 삼두', items: [
+    ['incline-db-press', 4, 9, 8], ['pec-deck-fly', 3, 85, 10], ['assisted-dips', 3, 15, 12], ['chest-press-machine', 3, 41, 12],
+    ['triceps-ext-machine', 3, 20, 12], ['triceps-pushdown-machine', 3, 35, 10], ['triceps-pushdown', 3, 80, 10]] },
+  { title: '등, 이두, 어깨', items: [...MON_ITEMS,
+    ['cable-biceps-curl', 3, 36, 10], ['db-shoulder-press', 4, 6, 13], ['side-lateral-raise', 3, 5, 10]] },
+  { title: '다리, 코어', items: [
+    ['leg-press', 4, 75, 8], ['leg-extension', 3, 32, 14], ['leg-curl', 3, 32, 13], ['hip-adduction', 3, 115, 12],
+    ['leg-raise', 3, 0, 13], ['crunch', 3, 0, 17], ['plank', 3, 0, 40]] },
+  { title: '가슴, 삼두', items: [
+    ['incline-db-press', 3, 9, 8], ['chest-press-machine', 3, 41, 12], ['pec-deck-fly', 3, 85, 10], ['assisted-dips', 3, 15, 12],
+    ['triceps-ext-machine', 3, 20, 12], ['triceps-pushdown', 3, 80, 10], ['triceps-pushdown-machine', 3, 35, 10]] },
+  { title: '', items: [] }, // 일요일: 운동 계획 없음
+];
