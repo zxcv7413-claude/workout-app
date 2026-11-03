@@ -15,7 +15,8 @@ const firebaseConfig = {
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
-const fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+// 일부 환경(사파리 홈 화면 앱, 특정 와이파이)에서 기본 연결이 막혀 무한 대기하는 문제를 막기 위해 롱폴링 자동 감지를 켭니다.
+const fs = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
 const AUTH = { status: 'loading', user: null, error: '', busy: false }; // loading | out | in
 let UID = null, unsubs = [], loaded = { state: false, logs: false, photos: false };
 const ref = {
@@ -146,8 +147,12 @@ function thumb(ex) {
 
 function authView() {
   if (AUTH.status === 'loading' || (AUTH.status === 'in' && !ready())) {
-    return `<div class="screen" style="align-items:center;justify-content:center"><div style="color:var(--sub)">불러오는 중…</div>
-      ${AUTH.status === 'in' ? '<button class="btn" style="margin-top:20px" data-a="logout">로그아웃</button>' : ''}</div>`;
+    const f = n => (loaded[n] ? '✓' : '…');
+    return `<div class="screen" style="align-items:center;justify-content:center;padding:24px;text-align:center"><div style="color:var(--sub)">불러오는 중…</div>
+      ${AUTH.status === 'in' ? `<div class="hint" style="margin-top:14px">상태 ${f('state')} · 기록 ${f('logs')} · 사진 ${f('photos')}<br>${navigator.onLine ? '온라인' : '⚠️ 오프라인'}</div>
+      ${AUTH.error ? `<div style="color:var(--danger);margin-top:10px;font-size:13px;word-break:break-all">${esc(AUTH.error)}</div>` : ''}
+      <button class="btn" style="margin-top:20px" data-a="reload">다시 시도</button>
+      <button class="btn" style="margin-top:10px" data-a="logout">로그아웃</button>` : ''}</div>`;
   }
   return `<div class="screen" style="justify-content:center;padding:24px">
     <div style="text-align:center;font-size:44px">🏋️</div><h1 style="text-align:center;margin:6px 0 20px">운동기록</h1>
@@ -453,6 +458,7 @@ document.addEventListener('click', ev => {
   if (el.classList.contains('overlay') && ev.target !== el) return;
   const a = el.dataset.a, v = el.dataset.v, id = el.dataset.id, i = el.dataset.i !== undefined ? +el.dataset.i : null;
   if (a === 'login') { doLogin(); return; }
+  if (a === 'reload') { location.reload(); return; }
   if (a === 'logout') { if (confirm('로그아웃할까요?')) signOut(auth); return; }
   if (!ready()) return;
   const d = S.plan[U.day];
@@ -679,6 +685,7 @@ onAuthStateChanged(auth, user => {
 });
 
 // ───────────────────────── 시작
+setInterval(() => { if (AUTH.status === 'in' && !ready()) render(); }, 1500); // 로딩 진단 표시 갱신
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
 render();
