@@ -692,6 +692,14 @@ onAuthStateChanged(auth, user => {
 });
 
 // ───────────────────────── 시작
+// iOS 홈 화면 앱에서 화면 아래쪽이 비는 문제 방지: 실제 화면 높이를 계산해 앱 높이로 지정합니다.
+function fitHeight() {
+  let h = window.innerHeight;
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  if (standalone && window.innerHeight > window.innerWidth) h = Math.max(h, Math.max(screen.height, screen.width)); // 세로 모드
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+}
+fitHeight(); window.addEventListener('resize', fitHeight); window.addEventListener('orientationchange', () => setTimeout(fitHeight, 200));
 setInterval(() => { if (AUTH.status === 'in' && !ready()) render(); }, 1500); // 로딩 진단 표시 갱신
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
