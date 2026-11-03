@@ -91,12 +91,11 @@ const ready = () => AUTH.status === 'in' && loaded.state && loaded.logs && loade
 const fail = e => { console.error(e); toast('저장에 실패했습니다'); };
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(flush, 250); }
 // 상태 문서(운동 목록·플랜·진행 중 운동·설정)를 저장. 기록(logs)과 사진은 각각 별도 문서로 저장합니다.
-function flush() {
-  clearTimeout(saveTimer);
-  if (!ready()) return;
+function writeState() {
   const { logs, ...rest } = S;
   setDoc(ref.state(), { json: JSON.stringify(rest), updatedAt: Date.now() }).catch(fail);
 }
+function flush() { clearTimeout(saveTimer); if (ready()) writeState(); }
 const saveLog = l => { if (UID) setDoc(ref.log(l.id), { json: JSON.stringify(l), start: l.start }).catch(fail); };
 const removeLog = id => { if (UID) deleteDoc(ref.log(id)).catch(fail); };
 const savePhoto = (id, data) => { if (UID) setDoc(ref.photo(id), { data }).catch(fail); };
@@ -108,7 +107,7 @@ async function replaceAll(newS, newP) {
   Object.keys(P).forEach(k => ops.push(b => b.delete(ref.photo(k))));
   newS.logs.forEach(l => ops.push(b => b.set(ref.log(l.id), { json: JSON.stringify(l), start: l.start })));
   Object.keys(newP).forEach(k => ops.push(b => b.set(ref.photo(k), { data: newP[k] })));
-  S = newS; P = newP; flush();
+  S = newS; P = newP; writeState(); // 최초 생성 시에는 아직 ready()가 아니므로 직접 저장
   // 오프라인이어도 쓰기는 대기열에 쌓였다가 연결되면 반영됩니다.
   for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(fs); ops.slice(i, i + 400).forEach(f => f(b)); b.commit().catch(fail); }
 }
