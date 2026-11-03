@@ -1,4 +1,4 @@
-const CACHE = 'workout-v7';
+const CACHE = 'workout-v8';
 const FILES = ['./', './index.html', './style.css', './data.js', './app.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 const FB = ['firebase-app', 'firebase-auth', 'firebase-firestore'].map(n => `https://www.gstatic.com/firebasejs/10.14.1/${n}.js`);
@@ -19,7 +19,7 @@ self.addEventListener('fetch', e => {
   // Firebase 인증/Firestore 통신은 SDK가 직접 처리하므로 캐시하지 않습니다.
   if (host.endsWith('googleapis.com') || host.endsWith('firebaseio.com') || host.endsWith('firebaseapp.com')) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: 'no-cache' }).then(r => { // 브라우저의 10분 캐시를 건너뛰고 항상 최신 여부를 서버에 확인
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;

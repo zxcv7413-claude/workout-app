@@ -403,7 +403,7 @@ function settingsView() {
       <div class="hint">기본 운동 목록에서 빠진 항목을 다시 추가합니다. 수정한 가이드·메모는 유지됩니다.</div>
       <button class="btn block" style="margin-top:10px" data-a="restoreDefaults">복원</button></div>
     <button class="btn danger block" style="margin-top:18px" data-a="reset">모든 데이터 초기화</button>
-    <div class="hint" style="text-align:center;margin-top:16px">운동기록 v2 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
+    <div class="hint" style="text-align:center;margin-top:16px">운동기록 · 빌드 v8 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
 }
 
 // ───────────────────────── 시트(모달)
