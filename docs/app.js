@@ -139,8 +139,9 @@ const spacer = '<span class="icon-btn"></span>';
 const topbar = (l, title, r) => `<div class="topbar">${l || spacer}<h1>${esc(title)}</h1>${r || spacer}</div>`;
 function thumb(ex) {
   const pid = ex && ex.photos && ex.photos[0];
-  if (pid && P[pid]) return `<div class="thumb"><img src="${P[pid]}" alt=""></div>`;
-  return `<div class="thumb">${esc(ex ? ex.part : '?')}</div>`;
+  const act = ex ? `data-a="thumbPick" data-id="${esc(ex.id)}"` : '';
+  if (pid && P[pid]) return `<div class="thumb" ${act}><img src="${P[pid]}" alt=""></div>`;
+  return `<div class="thumb" ${act}>${esc(ex ? ex.part : '?')}<span class="cam">📷</span></div>`;
 }
 
 function authView() {
@@ -235,7 +236,9 @@ function exGuide(ex, s) {
   const chips = [['eq', '기구 사용법'], ['memo', '내 메모'], ['guide', '운동 가이드']]
     .map(([k, t]) => `<button class="chip ${sub === k ? 'on' : ''}" data-a="exSub" data-v="${k}">${t}</button>`).join('');
   const photos = (ex.photos || []).filter(p => P[p]).map(p => `<div style="position:relative"><img class="photo" src="${P[p]}" alt="">
-      <button class="chip" style="position:absolute;right:8px;top:22px;background:#000a" data-a="photoDel" data-p="${p}">삭제</button></div>`).join('');
+      <div style="position:absolute;right:8px;top:22px;display:flex;gap:6px">
+      ${p === ex.photos[0] ? '<span class="chip" style="background:#000a;color:var(--accent)">대표</span>' : `<button class="chip" style="background:#000a" data-a="photoMain" data-p="${p}">대표로</button>`}
+      <button class="chip" style="background:#000a" data-a="photoDel" data-p="${p}">삭제</button></div></div>`).join('');
   let body = '';
   if (sub === 'eq') body = `<h2>기구 사용법</h2>${(gd.eq || []).length ? ol(gd.eq) : '<div class="hint">작성된 내용이 없습니다. 우측 상단 ✎에서 입력하세요.</div>'}`;
   else if (sub === 'memo') body = `<h2>내 메모</h2><textarea id="exMemo" rows="6" placeholder="예: 시트 3칸, 핀 위치, 팔꿈치 느낌 등">${esc(ex.memo)}</textarea>
@@ -496,6 +499,8 @@ document.addEventListener('click', ev => {
       if (confirm('이 사진을 삭제할까요?')) { ex.photos = ex.photos.filter(p => p !== el.dataset.p); delete P[el.dataset.p]; removePhoto(el.dataset.p); save(); }
       break;
     }
+    case 'thumbPick': thumbInput.dataset.id = id; thumbInput.value = ''; thumbInput.click(); return;
+    case 'photoMain': { const ex = exById(topEx().id); ex.photos = [el.dataset.p, ...ex.photos.filter(x => x !== el.dataset.p)]; save(); break; }
     case 'libPart': U.libPart = v; break;
     case 'start': startWorkout(); return;
     case 'resume': U.stack.push({ t: 'workout' }); break;
@@ -563,6 +568,15 @@ document.addEventListener('change', async ev => {
       const ex = exById(t.dataset.id); ex.photos = ex.photos || []; ex.photos.push(pid); save(); render(); toast('사진을 추가했습니다');
     } catch (e) { toast('사진을 불러오지 못했습니다'); }
   } else if (t.id === 'importIn' && t.files[0]) importData(t.files[0]);
+});
+const thumbInput = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' });
+thumbInput.style.display = 'none'; document.body.appendChild(thumbInput);
+thumbInput.addEventListener('change', async () => {
+  const f = thumbInput.files[0]; const ex = ready() && exById(thumbInput.dataset.id); if (!f || !ex) return;
+  try {
+    const url = await resizeImage(f); const pid = 'p-' + uid(); P[pid] = url; savePhoto(pid, url);
+    ex.photos = [pid, ...(ex.photos || [])]; save(); render(); toast('대표 사진으로 설정했습니다');
+  } catch (e) { toast('사진을 불러오지 못했습니다'); }
 });
 function resizeImage(file, max = 900) {
   return new Promise((res, rej) => {

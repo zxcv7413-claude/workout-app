@@ -1,4 +1,4 @@
-const CACHE = 'workout-v2';
+const CACHE = 'workout-v3';
 const FILES = ['./', './index.html', './style.css', './data.js', './app.js', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 const FB = ['firebase-app', 'firebase-auth', 'firebase-firestore'].map(n => `https://www.gstatic.com/firebasejs/10.14.1/${n}.js`);
