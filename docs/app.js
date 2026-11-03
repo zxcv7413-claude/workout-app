@@ -1,7 +1,7 @@
 /* 운동기록 PWA — 바닐라 JS + Firebase(로그인/Firestore 동기화, 오프라인 지원) */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch }
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDocFromServer, setDoc, deleteDoc, collection, onSnapshot, writeBatch }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 // Firebase 웹 설정값 (공개되어도 되는 값이며, 데이터 보호는 로그인 + Firestore 보안 규칙이 담당합니다)
@@ -652,7 +652,15 @@ async function bootstrapCloud() {
 function startSync() {
   stopSync();
   unsubs.push(onSnapshot(ref.state(), snap => {
-    if (!snap.exists()) { if (!snap.metadata.fromCache && !bootstrapping) { bootstrapping = true; bootstrapCloud(); } return; }
+    if (!snap.exists()) {
+      // 상태 문서가 없으면 서버에 직접 확인한 뒤에만 최초 데이터를 만듭니다(오래된 캐시 때문에 기존 데이터를 덮어쓰지 않도록).
+      if (!bootstrapping) {
+        bootstrapping = true;
+        getDocFromServer(ref.state()).then(d => { if (!d.exists()) return bootstrapCloud(); bootstrapping = false; })
+          .catch(e => { bootstrapping = false; AUTH.error = '서버 확인 실패 (' + (e.code || e.message) + ') — 다시 시도를 눌러 주세요'; render(); });
+      }
+      return;
+    }
     if (loaded.state && snap.metadata.hasPendingWrites) return; // 내가 방금 쓴 변경은 이미 반영되어 있음
     try { S = normalizeState({ ...JSON.parse(snap.data().json), logs: cloudLogs }); } catch (e) { return fail(e); }
     loaded.state = true; afterRemote();
