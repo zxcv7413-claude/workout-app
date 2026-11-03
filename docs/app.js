@@ -390,6 +390,14 @@ function libView() {
 }
 
 // ───────────────────────── 설정 탭
+function diagText() {
+  const pr = document.createElement('div');
+  pr.style.cssText = 'position:fixed;left:0;bottom:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden';
+  document.body.appendChild(pr); const sb = parseFloat(getComputedStyle(pr).paddingBottom) || 0; pr.remove();
+  const st = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const vv = window.visualViewport ? Math.round(window.visualViewport.height) : '-';
+  return `홈 화면 앱(standalone): ${st ? '예' : '아니오'}<br>창 ${innerWidth}×${innerHeight} · 화면 ${screen.width}×${screen.height}<br>visualViewport 높이 ${vv} · 하단 안전영역 ${sb}`;
+}
 function settingsView() {
   return `${topbar('', '설정', '')}<div class="scroll" data-k="set">
     <div class="card"><label style="margin-top:0">기본 휴식 시간 (초)</label><input id="restSec" inputmode="numeric" value="${S.settings.rest}"></div>
@@ -399,11 +407,12 @@ function settingsView() {
       <label class="btn" style="text-align:center;cursor:pointer">가져오기<input type="file" accept="application/json,.json" id="importIn" style="display:none"></label></div></div>
     <div class="card"><div style="font-weight:700;margin-bottom:6px">계정 · 동기화</div><div class="hint" id="storeInfo">계정: ${esc(AUTH.user ? AUTH.user.email : '-')}<br>기록 ${S.logs.length}회 · 운동 ${S.exercises.length}개</div>
       <button class="btn block" style="margin-top:10px" data-a="logout">로그아웃</button></div>
+    <div class="card"><div style="font-weight:700;margin-bottom:6px">화면 진단</div><div class="hint">${diagText()}</div></div>
     <div class="card"><div style="font-weight:700;margin-bottom:6px">기본 가이드 복원</div>
       <div class="hint">기본 운동 목록에서 빠진 항목을 다시 추가합니다. 수정한 가이드·메모는 유지됩니다.</div>
       <button class="btn block" style="margin-top:10px" data-a="restoreDefaults">복원</button></div>
     <button class="btn danger block" style="margin-top:18px" data-a="reset">모든 데이터 초기화</button>
-    <div class="hint" style="text-align:center;margin-top:16px">운동기록 · 빌드 v8 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
+    <div class="hint" style="text-align:center;margin-top:16px">운동기록 · 빌드 v9 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
 }
 
 // ───────────────────────── 시트(모달)
@@ -692,14 +701,6 @@ onAuthStateChanged(auth, user => {
 });
 
 // ───────────────────────── 시작
-// iOS 홈 화면 앱에서 화면 아래쪽이 비는 문제 방지: 실제 화면 높이를 계산해 앱 높이로 지정합니다.
-function fitHeight() {
-  let h = window.innerHeight;
-  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  if (standalone && window.innerHeight > window.innerWidth) h = Math.max(h, Math.max(screen.height, screen.width)); // 세로 모드
-  document.documentElement.style.setProperty('--app-h', h + 'px');
-}
-fitHeight(); window.addEventListener('resize', fitHeight); window.addEventListener('orientationchange', () => setTimeout(fitHeight, 200));
 setInterval(() => { if (AUTH.status === 'in' && !ready()) render(); }, 1500); // 로딩 진단 표시 갱신
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
