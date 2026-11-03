@@ -240,11 +240,15 @@ function planView() {
           ${ex && ex.memos.length ? `<div class="memo">📝 ${esc(ex.memos[0])}${ex.memos.length > 1 ? ` (+${ex.memos.length - 1})` : ''}</div>` : ''}</div></div>${ctl}</div>`;
   }).join('');
   const act = S.active;
+  const long = act && Date.now() - act.start > 3 * 3600e3;
+  const banner = act ? `<div class="card" style="margin:8px 0 6px;border:1px solid var(--accent)"><div style="font-weight:700">진행 중인 운동 · ${esc(act.title)}</div>
+    <div class="hint">시작 ${fmtT(act.start)} · 경과 ${fmtClock(Date.now() - act.start)}${long ? ' — 오래 진행 중이에요. 잘못 시작했다면 취소하세요.' : ''}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" data-a="wCancel">운동 취소</button><button class="btn primary" data-a="resume">이어하기</button></div></div>` : '';
   const btn = d.items.length || act
     ? `<button class="fab" data-a="${act ? 'resume' : 'start'}">${act ? '운동 이어하기' : '시작하기'}</button>` : '';
   return `${topbar('', `${DAYS[U.day]}요일 플랜`, '')}
   <div class="days">${DAYS.map((x, i) => `<button class="${i === U.day ? 'on' : ''} ${i === today ? 'today' : ''}" data-a="day" data-v="${i}">${x}</button>`).join('')}</div>
-  <div class="scroll" data-k="plan${U.day}">
+  <div class="scroll" data-k="plan${U.day}">${banner}
     <input id="dayTitle" value="${esc(d.title)}" placeholder="이 날의 부위 (예: 등, 이두)" style="margin:6px 0 4px">
     <div class="meta"><span>총 ${d.items.length}개</span><span>|</span><span>⏱ ${estMin(d.items)} 분</span><span class="sp"></span>
       <button class="chip ${U.edit ? 'on' : ''}" data-a="toggleEdit">${U.edit ? '완료' : '⇅ 순서 변경'}</button></div>
@@ -394,7 +398,7 @@ function workoutView() {
       ${ex ? `<div class="wk-tabs"><button data-a="anaOpen" data-id="${esc(ex.id)}">📊 기록 및 분석</button><button data-a="cautOpen" data-id="${esc(ex.id)}">⚠️ 주의사항</button></div>` : ''}
       ${setRows(a, e, ex)}
       ${resting ? `<div class="restpanel"><span style="font-size:13px">휴식</span><span class="tm" id="restTm">${fmtClock(a.restEnd - Date.now())}</span><button data-a="restAdj" data-v="-10">-10초</button><button data-a="restAdj" data-v="10">+10초</button></div>` : ''}
-      <div style="height:12px"></div></div>
+      <button class="btn danger block" style="margin:14px 0 8px;opacity:.85" data-a="wCancel">운동 취소 (기록하지 않음)</button></div>
     <div class="wk-bottom">${resting ? '<button class="b-rest" data-a="restSkip">휴식 건너뛰기</button><button class="b-done" disabled>휴식 중…</button>'
       : '<button class="b-rest" data-a="wRest">휴식 타이머</button><button class="b-done" data-a="wSetDone">세트 완료</button>'}</div>`;
 }
@@ -565,7 +569,7 @@ function settingsView() {
       <div class="hint">참고 앱 기준의 요일별 운동 계획을 다시 넣습니다. 지금 입력된 화~토요일 플랜은 <b>모두 덮어씁니다</b>. (월요일·일요일은 그대로)</div>
       <button class="btn block" style="margin-top:10px" data-a="applyPlans">덮어쓰기</button></div>
     <button class="btn danger block" style="margin-top:18px" data-a="reset">모든 데이터 초기화</button>
-    <div class="hint" style="text-align:center;margin-top:16px">운동기록 · 빌드 v11 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
+    <div class="hint" style="text-align:center;margin-top:16px">운동기록 · 빌드 v12 · 개인용</div><div class="pad-bottom" style="height:30px"></div></div>`;
 }
 
 // ───────────────────────── 시트(모달)
@@ -613,7 +617,8 @@ function sheetView() {
       <button class="btn block" style="margin-top:14px" data-a="wAddEx">＋ 운동 추가</button>
       ${cur ? `<div class="row" style="margin-top:10px"><button class="btn" data-a="wAddSet">＋ 세트 (${esc(exName(cur.exId))})</button><button class="btn" data-a="wDelSet">－ 세트</button></div>` : ''}
       <button class="btn block" style="margin-top:10px" data-a="wPrev">↩ 이전 세트로 되돌리기</button>
-      <button class="btn primary block" style="margin-top:10px" data-a="wFinish">운동 종료하고 저장</button>`;
+      <button class="btn primary block" style="margin-top:10px" data-a="wFinish">운동 종료하고 저장</button>
+      <button class="btn danger block" style="margin-top:10px" data-a="wCancel">운동 취소 (기록하지 않음)</button>`;
   }
   return `<div class="overlay" data-a="closeSheet"><div class="sheet">${inner}</div></div>`;
 }
@@ -727,6 +732,11 @@ document.addEventListener('click', ev => {
     case 'wAddSet': { const a = S.active, e = a.entries[Math.min(a.ci, a.entries.length - 1)]; const l = e.sets[e.sets.length - 1] || { kg: 0, reps: 10 }; e.sets.push({ kg: l.kg, reps: l.reps, done: false }); save(); break; }
     case 'wDelSet': { const a = S.active, e = a.entries[Math.min(a.ci, a.entries.length - 1)]; if (e.sets.length > 1) { e.sets.pop(); a.si = Math.min(a.si, e.sets.length - 1); } save(); break; }
     case 'wFinish': U.sheet = null; finishWorkout(); break;
+    case 'wCancel': // 잘못 시작한 운동: 기록을 남기지 않고 취소
+      if (S.active && confirm('진행 중인 운동을 기록하지 않고 취소할까요?\n지금까지 입력한 세트는 저장되지 않습니다.')) {
+        S.active = null; U.stack = U.stack.filter(x => x.t !== 'workout'); U.sheet = null; save(); toast('운동을 취소했습니다');
+      }
+      break;
     case 'restAdj': S.active.restEnd = Math.max(Date.now() + 1000, S.active.restEnd + (+v) * 1000); save(); break;
     case 'restSkip': endRest(S.active); save(); break;
     case 'applyPlans':
